@@ -4,9 +4,11 @@ def install_action():
     pass
 
 def help_action(action=None):
-    """Prints help"""
-    print dir()
+    pass
+
+def available_actions():
+    return [(a[:-7], f) for (a,f) in globals().items() 
+                if type(f).__name__ == 'function' and a[-6:] == 'action']
 
 if __name__ == "__main__":
-    actions = [(a[:-7], a) for a in dir() if "_action" in a]
-    print actions
+    print available_actions()
