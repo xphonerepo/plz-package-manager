@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+def install_action():
+    pass
+
+def help_action(action=None):
+    """Prints help"""
+    print dir()
+
+if __name__ == "__main__":
+    actions = [(a[:-7], a) for a in dir() if "_action" in a]
+    print actions
