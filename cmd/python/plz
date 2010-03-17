@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2010,
 #
-# Ben Caldwel       http://twitter.com/lankzy
+# Ben Caldwell      http://twitter.com/lankzy
 # Wei Zhuo          http://twitter.com/xwz
 #
 # Permission is hereby granted, free of charge, to any person
@@ -30,15 +30,31 @@
 #
 # rev: $Id$
 
-def install_action():
+import inspect, sys
+
+def install_action(package=[]):
+    """
+    Installs a package.
+    """
     pass
 
 def help_action(action=None):
-    pass
+    """
+    Display help information for a given action.
+
+    Usage: xxxx
+    """
+    all_actions = dict(available_actions());
+    if action in all_actions:
+        func = all_actions[action]
+        print inspect.cleandoc(func.__doc__)
+        print inspect.getargspec(func)
+    else:
+        print "Available actions: \n    %s" % "\n    ".join(all_actions.keys())
 
 def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
 if __name__ == "__main__":
-    print available_actions()
+    help_action(sys.argv[-1])
