@@ -32,25 +32,47 @@
 
 import inspect, sys
 
-def install_action(package=[]):
+def install_action(packages, options={}):
     """
-    Installs a package.
-    """
-    pass
+    Installs a list of packages.
+    usage: plz install PACKAGES...
 
-def help_action(action=None):
-    """
-    Display help information for a given action.
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque id consectetur
+    urna. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere 
+    cubilia Curae; Morbi adipiscing congue massa a imperdiet. Integer et nulla 
+    posuere urna lobortis rhoncus id convallis lacus.
 
-    Usage: xxxx
+    Valid options:
+        -n [--dryrun]           : do a dry run install
+        -q [--quiet]            : print nothing, or only summary information
+        --force                 : force operation to run
     """
-    all_actions = dict(available_actions());
-    if action in all_actions:
-        func = all_actions[action]
-        print inspect.cleandoc(func.__doc__)
-        print inspect.getargspec(func)
-    else:
-        print "Available actions: \n    %s" % "\n    ".join(all_actions.keys())
+    print options, args
+
+def help_action(action=None, options={}):
+    """
+    Display help information for an action.
+    usage: plz help ACTION
+    """
+    print get_action_doc(action) or default_help()
+
+def default_help():
+    info = """
+    usage: plz <command> [options] [args]
+    Type 'plz help <command>' for help on a specific command.
+
+    Available actions:
+        %(actions)s
+    
+    plz is a simple package management system.
+    For additional information, see http://getplz.com/
+    rev: $Id$
+    """
+    actions = "\n    ".join(k for (k,v) in available_actions())
+    return inspect.cleandoc(info) % locals()
+
+def get_action_doc(action):
+    return inspect.cleandoc(dict(available_actions()).pop(action, None).__doc__ or "")
 
 def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
