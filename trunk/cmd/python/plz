@@ -70,13 +70,16 @@ def default_help():
     rev: $Id$
     """
     actions = "\n    ".join(k for (k,v) in available_actions())
-    return inspect.cleandoc(info) % locals()
+    return cleandoc(info) % locals()
 
 def help_doc(action):
     """
     Returns the documentation for an action, empty if unknown action.
     """
-    return inspect.cleandoc(dict(available_actions()).pop(action, None).__doc__ or "")
+    return cleandoc(dict(available_actions()).pop(action, None).__doc__ or "")
+
+def cleandoc(doc):
+    return re.compile("^ {4}", re.M).sub("", doc).strip()
 
 def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
@@ -119,7 +122,7 @@ def get_options(action):
 def min_args(func):
     """Returns minimum number of required arguments of the function."""
     spec = inspect.getargspec(func)
-    return len(spec.args) - len(spec.defaults)
+    return len(spec[0]) - len(spec[3]) 
 
 def first(val):
     """Returns 1st element of a list, None otherwise"""
