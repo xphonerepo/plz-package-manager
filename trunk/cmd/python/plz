@@ -72,6 +72,9 @@ def default_help():
     return inspect.cleandoc(info) % locals()
 
 def get_action_doc(action):
+    """
+    Returns the documentation for an action, empty if unknown action.
+    """
     return inspect.cleandoc(dict(available_actions()).pop(action, None).__doc__ or "")
 
 def available_actions():
