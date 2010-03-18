@@ -138,16 +138,16 @@ def dispatch(argv):
     The action function's first argument may be optional, otherwise
     the user must provide at least one input argument value.
     """
-    func = dict(available_actions()).pop(sys.argv[1],None)
-    parser = get_options(sys.argv[1])
+    func = dict(available_actions()).pop(argv[1],None)
+    parser = get_options(argv[1])
     if func:
-        options, args = parser.parse_args(sys.argv[2:])
+        options, args = parser.parse_args(argv[2:])
         if len(args) >= min_args(func):
             func(args, options)
         else:
-            parser.error("command '%s' requires an argument" % sys.argv[1])
+            parser.error("command '%s' requires an argument" % argv[1])
     else:
-        parser.error("Unknown command '%s'" % sys.argv[1])
+        parser.error("Unknown command '%s'" % argv[1])
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
