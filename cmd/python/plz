@@ -30,7 +30,7 @@
 #
 # rev: $Id$
 
-import inspect, sys
+import inspect, sys, re, optparse
 
 def install_action(packages, options={}):
     """
@@ -45,6 +45,7 @@ def install_action(packages, options={}):
     Valid options:
         -n [--dryrun]           : do a dry run install
         -q [--quiet]            : print nothing, or only summary information
+        -b [--branch] ARG       : use packages from a specific branch
         --force                 : force operation to run
     """
     print options, args
@@ -81,5 +82,44 @@ def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
+def action_options(action):
+    """
+    Extract action options from action function doc. Returns OptionParser.
+    
+    Action can specify in the docstring a list of optional arguments
+    that will be processed and passed as the options argument to the action function.
+
+    The following formats are allowed:
+
+        -n [--name] ARG         : short/long value options
+        -n [--name]             : short/long boolean option
+        --name ARG              : long value option
+        --name                  : long boolean option
+    
+    The ARG denotes that the option can take a value, otherwise boolean options.
+
+    The following formats are NOT supported: 
+    (short options must be an alternative to the long option)
+
+        -n                      : short boolean option
+        -n ARG                  : short value option
+    """
+    doc = get_action_doc(action)
+    pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*(\w+)?\s*:"
+    options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
+    usage = re.findall("^(usage: .*)$", doc, re.M)[-1]
+    parser = optparse.OptionParser(usage=usage, conflict_handler="resolve")
+    for opt in options:
+        if opt[-1] == 'ARG':
+            parser.add_option(*opt[:-2], **dict(dest=opt[-2]))
+        else:
+            parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
+    return parser
+
 if __name__ == "__main__":
-    help_action(sys.argv[-1])
+    if len(sys.argv) > 1:
+        parser = action_options(sys.argv[1])
+        (options, args) = parser.parse_args(sys.argv[2:])
+        print options, args
+    else:
+        print default_help()
