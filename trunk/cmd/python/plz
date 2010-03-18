@@ -48,14 +48,14 @@ def install_action(packages, options={}):
         -b [--branch] ARG       : use packages from a specific branch
         --force                 : force operation to run
     """
-    print options, args
+    print options, packages
 
 def help_action(action=None, options={}):
     """
     Display help information for an action.
     usage: plz help ACTION
     """
-    print get_action_doc(action) or default_help()
+    print help_doc(first(action)) or help_doc('help')
 
 def default_help():
     info = """
@@ -72,7 +72,7 @@ def default_help():
     actions = "\n    ".join(k for (k,v) in available_actions())
     return inspect.cleandoc(info) % locals()
 
-def get_action_doc(action):
+def help_doc(action):
     """
     Returns the documentation for an action, empty if unknown action.
     """
@@ -82,7 +82,7 @@ def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
-def action_options(action):
+def get_options(action):
     """
     Extract action options from action function doc. Returns OptionParser.
     
@@ -104,11 +104,11 @@ def action_options(action):
         -n                      : short boolean option
         -n ARG                  : short value option
     """
-    doc = get_action_doc(action)
+    doc = help_doc(action)
     pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*(\w+)?\s*:"
     options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
-    usage = re.findall("^(usage: .*)$", doc, re.M)[-1]
-    parser = optparse.OptionParser(usage=usage, conflict_handler="resolve")
+    usage = re.findall("^(usage: .*)$", doc, re.M) or ["usage: plz <command>"]
+    parser = optparse.OptionParser(usage=usage[0], conflict_handler="resolve")
     for opt in options:
         if opt[-1] == 'ARG':
             parser.add_option(*opt[:-2], **dict(dest=opt[-2]))
@@ -116,10 +116,41 @@ def action_options(action):
             parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
     return parser
 
+def min_args(func):
+    """Returns minimum number of required arguments of the function."""
+    spec = inspect.getargspec(func)
+    return len(spec.args) - len(spec.defaults)
+
+def first(val):
+    """Returns 1st element of a list, None otherwise"""
+    if hasattr(val, '__getitem__') and len(val) > 0:
+        return val[0]
+    else:
+        return None
+
+def dispatch(argv):
+    """
+    Calls action functions with list of values and options dict.
+    
+    All action functions must accept 2 arguments, first a list
+    of input argument values, and second an options dictionary.
+
+    The action function's first argument may be optional, otherwise
+    the user must provide at least one input argument value.
+    """
+    func = dict(available_actions()).pop(sys.argv[1],None)
+    parser = get_options(sys.argv[1])
+    if func:
+        options, args = parser.parse_args(sys.argv[2:])
+        if len(args) >= min_args(func):
+            func(args, options)
+        else:
+            parser.error("command '%s' requires an argument" % sys.argv[1])
+    else:
+        parser.error("Unknown command '%s'" % sys.argv[1])
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        parser = action_options(sys.argv[1])
-        (options, args) = parser.parse_args(sys.argv[2:])
-        print options, args
+        dispatch(sys.argv)
     else:
         print default_help()
