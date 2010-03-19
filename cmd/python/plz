@@ -50,6 +50,8 @@ def install_action(packages, options={}):
     """
     print options, packages
 
+i_action = install_action
+
 def help_action(action=None, options={}):
     """
     Display help information for an action.
@@ -69,8 +71,23 @@ def default_help():
     For additional information, see http://getplz.com/
     rev: $Id$
     """
-    actions = "\n    ".join(k for (k,v) in available_actions())
+    names = []
+    len_cmp = lambda x,y:len(y)-len(x)
+    for alias in [sorted(a, len_cmp) for f,a in aliases().items()]:
+        if len(alias) > 1:
+            names.append("%s (%s)" % (alias[0], ", ".join(alias[1:])))
+        else:
+            names.append(alias[0])
+    actions = "\n    ".join(sorted(names))
     return cleandoc(info) % locals()
+
+def aliases():
+    actions = dict()
+    for a,f in available_actions():
+        if f not in actions:
+            actions[f] = []
+        actions[f].append(a)
+    return actions
 
 def help_doc(action):
     """
@@ -84,7 +101,6 @@ def cleandoc(doc):
 def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
-
 def get_options(action):
     """
     Extract action options from action function doc. Returns OptionParser.
