@@ -34,7 +34,7 @@ import inspect, sys, re, optparse
 
 def install_action(packages, options={}):
     """
-    Installs a list of packages.
+    Install a list of packages.
     usage: plz install PACKAGES...
 
     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque id consectetur
@@ -60,9 +60,23 @@ def help_action(action=None, options={}):
     """
     doc = help_doc(first(action))
     if len(doc) == 0:
-        actions = sorted(a for (a,f) in available_actions() if len(a) > 1)
+        actions = sorted(a for a,f in available_actions() if len(a) > 2)
         doc = help_doc('help') % ", ".join(actions)
     print doc
+
+def start_action(packages, options={}):
+    """
+    Start a list of packages.
+    usage: plz start PACKGES...
+    """
+
+def stop_action(packages, options={}):
+    """
+    Stop a list of packages.
+    usage: plz stop PACKAGES...
+    """
+
+# --- support functions ---
 
 def default_help():
     info = """
@@ -105,7 +119,7 @@ def cleandoc(doc):
     return re.compile("^ {4}", re.M).sub("", doc).strip()
 
 def available_actions():
-    return [(a[:-7], f) for (a,f) in globals().items() 
+    return [(a[:-7], f) for a,f in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
 def get_options(action):
