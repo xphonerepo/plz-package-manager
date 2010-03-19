@@ -62,6 +62,8 @@ def help_action(action=None, options={}):
     if len(doc) == 0:
         actions = sorted(a for a,f in available_actions() if len(a) > 2)
         doc = help_doc('help') % ", ".join(actions)
+    else:
+        doc += "\n\n" + cleandoc(global_options.__doc__)
     print doc
 
 def start_action(packages, options={}):
@@ -122,12 +124,20 @@ def available_actions():
     return [(a[:-7], f) for a,f in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
+def global_options():
+    """
+    Global options:
+        --username ARG          : specify a username ARG
+        --password ARG          : specify a password ARG
+    """
+
 def get_options(action):
     """
     Extract action options from action function doc. Returns OptionParser.
     
     Action can specify in the docstring a list of optional arguments
     that will be processed and passed as the options argument to the action function.
+    Additional options defined in global_options() is also processed.
 
     The following formats are allowed:
 
@@ -145,15 +155,18 @@ def get_options(action):
         -n ARG                  : short value option
     """
     doc = help_doc(action)
-    pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*(\w+)?\s*:"
-    options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
     usage = re.findall("^(usage: .*)$", doc, re.M) or ["usage: plz <command>"]
     parser = optparse.OptionParser(usage=usage[0], conflict_handler="resolve")
-    for opt in options:
-        if opt[-1] == 'ARG':
-            parser.add_option(*opt[:-2], **dict(dest=opt[-2]))
-        else:
-            parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
+    def parse_options(doc, parser):
+        pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*(\w+)?\s*:"
+        options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
+        for opt in options:
+            if opt[-1] == 'ARG':
+                parser.add_option(*opt[:-2], **dict(dest=opt[-2]))
+            else:
+                parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
+    parse_options(doc, parser)
+    parse_options(global_options.__doc__, parser)
     return parser
 
 def min_args(func):
