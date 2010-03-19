@@ -56,8 +56,13 @@ def help_action(action=None, options={}):
     """
     Display help information for an action.
     usage: plz help ACTION
+    actions: %s
     """
-    print help_doc(first(action)) or help_doc('help')
+    doc = help_doc(first(action))
+    if len(doc) == 0:
+        actions = sorted(a for (a,f) in available_actions() if len(a) > 1)
+        doc = help_doc('help') % ", ".join(actions)
+    print doc
 
 def default_help():
     info = """
@@ -82,6 +87,7 @@ def default_help():
     return cleandoc(info) % locals()
 
 def aliases():
+    """Returns action function names, including aliases"""
     actions = dict()
     for a,f in available_actions():
         if f not in actions:
@@ -101,6 +107,7 @@ def cleandoc(doc):
 def available_actions():
     return [(a[:-7], f) for (a,f) in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
+
 def get_options(action):
     """
     Extract action options from action function doc. Returns OptionParser.
@@ -164,7 +171,8 @@ def dispatch(argv):
         if len(args) >= min_args(func):
             func(args, options)
         else:
-            parser.error("command '%s' requires an argument" % argv[1])
+            action = first([a for a in aliases().pop(func) if len(a)>2])
+            parser.error("command '%s' requires an argument" % action)
     else:
         parser.error("Unknown command '%s'" % argv[1])
 
