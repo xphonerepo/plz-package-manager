@@ -77,6 +77,11 @@ def stop_action(packages, options={}):
     Stop a list of packages.
     usage: plz stop PACKAGES...
     """
+def restart_action(packages, options={}):
+    """
+    Restart a list of packages.
+    usage: plz restart PACKAGES...
+    """
 
 # --- support functions ---
 
@@ -129,6 +134,7 @@ def global_options():
     Global options:
         --username ARG          : specify a username ARG
         --password ARG          : specify a password ARG
+        -h [--host] ARG         : remote hosts
     """
 
 def get_options(action):
