@@ -98,8 +98,7 @@ def default_help():
     rev: $Id$
     """
     names = []
-    len_cmp = lambda x,y:len(y)-len(x)
-    for alias in [sorted(a, len_cmp) for f,a in aliases().items()]:
+    for alias in [sorted(a, key=len, reverse=True) for f,a in aliases().items()]:
         if len(alias) > 1:
             names.append("%s (%s)" % (alias[0], ", ".join(alias[1:])))
         else:
