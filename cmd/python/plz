@@ -133,8 +133,46 @@ def global_options():
     Global options:
         --username ARG          : specify a username ARG
         --password ARG          : specify a password ARG
-        -h [--host] ARG         : remote hosts
+        -h [--host] ARG...      : remote hosts
     """
+
+def range_expansion(s):
+    """
+    Expand square brackets placeholders of the form [x-y] and [a,b,c] to form 
+    a set of strings that replaces the placeholers with range(x,y) 
+    and 'a', 'b', 'c', respectively, and recursively. 
+
+    For example, the string 's[1-3].example.com' becomes
+    's1.example.com', 's2.example.com', and 's3.example.com'.
+
+    The string 'www.[one, two, three].example.com' becomes
+    'www.one.example.com', 'www.two.example.com', and 'www.three.example.com'.
+
+    Range values [x-y] must be integers and can be nested with [a,b,c] expansions.
+    For example, 'www.[s[1-3], p[1-3]].example.com' will produce:
+        'www.s1.example.com',
+        'www.s2.example.com',
+        'www.s3.example.com',
+        'www.p1.example.com',
+        'www.p2.example.com',
+        'www.p3.example.com'.
+    """
+    lines = []
+    def sub_range(m):
+        for i in range(int(m.group(1)), int(m.group(2))+1):
+            lines.append(m.string.replace(m.group(0),str(i),1))
+    def sub_element(m):
+        els = [w.strip() for w in m.group(1).split(',') if len(w.strip())>0]
+        lines.extend(m.string.replace(m.group(0), e, 1) for e in els)
+    re.sub('\[(\d+)-(\d+)\]', sub_range, s, 1)
+    re.sub('\[([\w,.:\s]+)\]', sub_element, s, 1)
+    result = set()
+    for line in lines:
+        if re.search('\[.+\]', line):
+            result |= range_expansion(line)
+        else:
+            result.add(line)
+    return result or set([s])
 
 def get_options(action):
     """
@@ -144,14 +182,19 @@ def get_options(action):
     that will be processed and passed as the options argument to the action function.
     Additional options defined in global_options() is also processed.
 
-    The following formats are allowed:
+    The following formats are supported:
 
         -n [--name] ARG         : short/long value options
         -n [--name]             : short/long boolean option
         --name ARG              : long value option
         --name                  : long boolean option
+        --host ARG...           : long multiple value option
     
     The ARG denotes that the option can take a value, otherwise boolean options.
+    The option can take multiple values by defining ARG... (suffix with 3 full stops)
+    Multiple value option must be specified in the command line as:
+
+        -h host1 -h host2 -h host3 ...
 
     The following formats are NOT supported: 
     (short options must be an alternative to the long option)
@@ -163,11 +206,13 @@ def get_options(action):
     usage = re.findall("^(usage: .*)$", doc, re.M) or ["usage: plz <command>"]
     parser = optparse.OptionParser(usage=usage[0], conflict_handler="resolve")
     def parse_options(doc, parser):
-        pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*(\w+)?\s*:"
+        pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*([\w.]+)?\s*:"
         options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
         for opt in options:
             if opt[-1] == 'ARG':
                 parser.add_option(*opt[:-2], **dict(dest=opt[-2]))
+            elif opt[-1] == 'ARG...':
+                parser.add_option(*opt[:-2], **dict(dest=opt[-2], action='append'))
             else:
                 parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
     parse_options(doc, parser)
