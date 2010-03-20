@@ -48,7 +48,8 @@ def install_action(packages, options={}):
         -b [--branch] ARG       : use packages from a specific branch
         --force                 : force operation to run
     """
-    print options, packages
+    print packages
+    print range_expansions(options.host)
 
 i_action = install_action
 
@@ -174,6 +175,14 @@ def range_expansion(s):
             result.add(line)
     return result or set([s])
 
+def range_expansions(iter):
+    """Do range expansion over a list, returns a set of expansions."""
+    results = set()
+    if hasattr(iter, '__iter__'):
+        for s in iter:
+            results |= range_expansion(s)
+    return results
+
 def get_options(action):
     """
     Extract action options from action function doc. Returns OptionParser.
@@ -184,11 +193,12 @@ def get_options(action):
 
     The following formats are supported:
 
-        -n [--name] ARG         : short/long value options
+        -n [--name] ARG...      : short/long multiple value option
+        -n [--name] ARG         : short/long value option
         -n [--name]             : short/long boolean option
+        --host ARG...           : long multiple value option
         --name ARG              : long value option
         --name                  : long boolean option
-        --host ARG...           : long multiple value option
     
     The ARG denotes that the option can take a value, otherwise boolean options.
     The option can take multiple values by defining ARG... (suffix with 3 full stops)
@@ -197,10 +207,11 @@ def get_options(action):
         -h host1 -h host2 -h host3 ...
 
     The following formats are NOT supported: 
-    (short options must be an alternative to the long option)
+    (short options MUST be an alternative to the long option)
 
-        -n                      : short boolean option
+        -n ARG...               : short multiple value option
         -n ARG                  : short value option
+        -n                      : short boolean option
     """
     doc = help_doc(action)
     usage = re.findall("^(usage: .*)$", doc, re.M) or ["usage: plz <command>"]
