@@ -99,7 +99,7 @@ def default_help():
     rev: $Id$
     """
     names = []
-    for alias in [sorted(a, key=len, reverse=True) for f,a in aliases().items()]:
+    for alias in [sorted(a, key=len, reverse=True) for a in aliases().values()]:
         if len(alias) > 1:
             names.append("%s (%s)" % (alias[0], ", ".join(alias[1:])))
         else:
@@ -178,9 +178,8 @@ def range_expansion(s):
 def range_expansions(iter):
     """Do range expansion over a list, returns a set of expansions."""
     results = set()
-    if hasattr(iter, '__iter__'):
-        for s in iter:
-            results |= range_expansion(s)
+    for s in iter or []:
+        results |= range_expansion(s)
     return results
 
 def get_options(action):
@@ -235,12 +234,10 @@ def min_args(func):
     spec = inspect.getargspec(func)
     return len(spec[0]) - len(spec[3]) 
 
-def first(val):
-    """Returns 1st element of a list, None otherwise"""
-    if hasattr(val, '__getitem__') and len(val) > 0:
-        return val[0]
-    else:
-        return None
+def first(iterable):
+    """Returns 1st element of an iterable."""
+    for item in iterable or []:
+       return item
 
 def dispatch(argv):
     """
