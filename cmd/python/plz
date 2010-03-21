@@ -157,6 +157,8 @@ def range_expansion(s):
         'www.p1.example.com',
         'www.p2.example.com',
         'www.p3.example.com'.
+
+    Similar result for 'www.[s,p][1-3].example.com'.
     """
     lines = []
     def sub_range(m):
