@@ -140,7 +140,7 @@ def global_options():
 def range_expansion(s):
     """
     Expand square brackets placeholders of the form [x-y] and [a,b,c] to form 
-    a set of strings that replaces the placeholers with range(x,y) 
+    a set of strings that replace the placeholers with range(x,y) 
     and 'a', 'b', 'c', respectively, and recursively. 
 
     For example, the string 's[1-3].example.com' becomes
