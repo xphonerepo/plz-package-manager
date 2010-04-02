@@ -229,7 +229,7 @@ def get_options(action):
                 parser.add_option(*opt[:-2], **dict(dest=opt[-2], default=env))
             elif opt[-1] == 'ARG...':
                 parser.add_option(*opt[:-2], **dict(dest=opt[-2], 
-                            action='append', default=filter(None, env.split())))
+                            action='append', default=filter(None, (env or "").split())))
             else:
                 parser.add_option(*opt[:-1], **dict(dest=opt[-1], action="store_true"))
     parse_options(doc, parser)
