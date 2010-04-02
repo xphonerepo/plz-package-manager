@@ -83,6 +83,51 @@ def restart_action(packages, options={}):
     Restart a list of packages.
     usage: plz restart PACKAGES...
     """
+def set_action(args, options={}):
+    """
+    Set package option values.
+    Usage: plz set package.variable=value ...
+    """
+    print args
+
+def create_action(args, options={}):
+    """
+    Create new packages.
+    Usage: plz create mypackage.plz ...
+    """
+    print args
+
+def activate_action(args, options={}):
+    """
+    Activate packages.
+    Usage: plz activate PACKAGES...
+    """
+
+enable_action = activate_action
+
+def deactivate_action(args, options={}):
+    """
+    Deactivate packages.
+    Usage: plz deactivate PACKAGES...
+    """
+
+disable_action = deactivate_action
+
+def remove_action(packages, options={}):
+    """
+    Remove packages.
+    Usage: plz remove PACKAGES...
+    """
+
+uninstall_action = rm_action = remove_action 
+
+def dist_action(files, options={}):
+    """
+    Push package files to a repository.
+
+    Valid options:
+        -r [--repo] ARG...      : respository url
+    """
 
 # --- support functions ---
 
@@ -132,6 +177,7 @@ def available_actions():
 def global_options():
     """
     Global options:
+        --root ARG              : the base file system path, default is /opt/plz
         --username ARG          : specify a username ARG
         --password ARG          : specify a password ARG
         -h [--host] ARG...      : remote hosts
