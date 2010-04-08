@@ -129,6 +129,30 @@ def dist_action(files, options={}):
         -r [--repo] ARG...      : respository url
     """
 
+def list_action(packages=[], options={}):
+    """
+    List installed packages.
+    Usage: plz list [PACKAGES...]
+    """
+
+ls_action = list_action
+
+def search_action(args, options={}):
+    """
+    Search for packages.
+    Usage: plz search NAME...
+    """
+
+find_action = search_action
+
+def dependents_action(packages, options={}):
+    """
+    List package dependencies.
+    Usage: plz dependents PACKAGES...
+    """
+
+deps_action = dependents_action
+
 # --- support functions ---
 
 def default_help():
