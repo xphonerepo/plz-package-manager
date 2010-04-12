@@ -373,7 +373,7 @@ def dirname(file):
 def curry(func, *args, **kw):
     """
     Transforms a function that takes multiple arguments so that it 
-    can be called as a chain of functions each with a single argument.
+    can be called with predefined argument values. 
     """
     return lambda *p, **n: func(*args + p, **dict(kw.items() + n.items()))
 
