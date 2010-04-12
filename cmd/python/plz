@@ -353,8 +353,8 @@ def shell(cmdstr, input=None, **kw):
 
 def partition(els, needle):
     """
-    Partitions the list by the given needle. 
-    E.g. partition([1,2,3,4,5,6], 3) returns [[1,2], [4,5,6]]
+    Partitions a list by the given needle. 
+    E.g. partition([1,2,3,4,5,3,6], 3) returns [[1,2], [4,5], [6]]
     """
     results = [[]]
     for el in els:
@@ -366,7 +366,7 @@ def partition(els, needle):
 
 def dirname(file):
     """
-    Returns the directory of a given file name, resolves realpath first.
+    Returns the directory of a file, resolves realpath first.
     """
     return os.path.dirname(os.path.realpath(file))
 
