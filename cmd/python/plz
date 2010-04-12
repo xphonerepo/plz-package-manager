@@ -96,7 +96,9 @@ def create_action(args, options={}):
     Usage: plz create mypackage.plz ...
     """
     for arg in args:
-        print parse_config(open(arg).read())
+        # set the CWD of the shell to the directory of the conf file
+        sh = curry(shell, cwd=dirname(arg)) 
+        print parse_config(open(arg).read(), shell=sh)
 
 def activate_action(args, options={}):
     """
@@ -339,13 +341,13 @@ def dispatch(argv):
     else:
         parser.error("Unknown command '%s'" % argv[1])
 
-def shell(cmdstr, input=None):
+def shell(cmdstr, input=None, **kw):
     """
     Execute system commands. e.g. shell('ls | grep opt')
     """
     import shlex, subprocess
     for cmd in partition(shlex.split(cmdstr), '|'):
-        p = subprocess.Popen(cmd, stdin=input, stdout=subprocess.PIPE)
+        p = subprocess.Popen(cmd, stdin=input, stdout=subprocess.PIPE, **kw)
         input = p.stdout
     return p.communicate()[0].strip()
 
@@ -361,6 +363,19 @@ def partition(els, needle):
         else:
             results[len(results)-1].append(el)
     return results
+
+def dirname(file):
+    """
+    Returns the directory of a given file name, resolves realpath first.
+    """
+    return os.path.dirname(os.path.realpath(file))
+
+def curry(func, *args, **kw):
+    """
+    Transforms a function that takes multiple arguments so that it 
+    can be called as a chain of functions each with a single argument.
+    """
+    return lambda *p, **n: func(*args + p, **dict(kw.items() + n.items()))
 
 # --- python based config parser ---
 
@@ -464,7 +479,7 @@ def _check_ast(astlist, forbidden):
     else:
         return _check_ast(astlist[1], forbidden)
        
-def parse_config(confstr):
+def parse_config(confstr,shell=shell):
     """
     Use *eval(...)* to execute a filtered AST tree formed by parsing a
     configuration file, removing unwanted expressions (if any) and then
