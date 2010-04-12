@@ -95,7 +95,8 @@ def create_action(args, options={}):
     Create new packages.
     Usage: plz create mypackage.plz ...
     """
-    print args
+    for arg in args:
+        print parse_config(open(arg).read())
 
 def activate_action(args, options={}):
     """
@@ -337,6 +338,166 @@ def dispatch(argv):
             parser.error("command '%s' requires an argument" % action)
     else:
         parser.error("Unknown command '%s'" % argv[1])
+
+def shell(cmdstr, input=None):
+    """
+    Execute system commands. e.g. shell('ls | grep opt')
+    """
+    import shlex, subprocess
+    for cmd in partition(shlex.split(cmdstr), '|'):
+        p = subprocess.Popen(cmd, stdin=input, stdout=subprocess.PIPE)
+        input = p.stdout
+    return p.communicate()[0].strip()
+
+def partition(els, needle):
+    """
+    Partitions the list by the given needle. 
+    E.g. partition([1,2,3,4,5,6], 3) returns [[1,2], [4,5,6]]
+    """
+    results = [[]]
+    for el in els:
+        if el == needle:
+            results.append([])
+        else:
+            results[len(results)-1].append(el)
+    return results
+
+# --- python based config parser ---
+
+# This parses a configuration file using a restricted Python syntax.
+# The Python tokenizer/parser is used to read the file, unwanted expressions
+# are removed from the parser output before the result is compiled and
+# executed. The initialised configuration settings are returned in a dict.
+# 
+# Based on http://code.activestate.com/recipes/576404-python-config-file-parser/
+# by Frithiof andreas, MIT license.
+
+import parser, symbol, token
+ 
+def _get_forbidden_symbols():
+    """
+    Returns a list of symbol codes representing statements that are NOT
+    wanted in configuration files.
+    """
+    try:
+        # Python 2.5:
+        symlst = [symbol.break_stmt, symbol.classdef, symbol.continue_stmt,
+                  symbol.decorator, symbol.decorators, symbol.eval_input,
+                  symbol.except_clause, symbol.exec_stmt, symbol.flow_stmt,
+                  symbol.for_stmt, symbol.fpdef, symbol.fplist, symbol.funcdef,
+                  symbol.global_stmt, symbol.import_as_name, symbol.import_as_names,
+                  symbol.import_from, symbol.import_name, symbol.import_stmt,
+                  symbol.lambdef, symbol.old_lambdef, symbol.print_stmt,
+                  symbol.raise_stmt, symbol.try_stmt, symbol.while_stmt,
+                  symbol.with_stmt, symbol.with_var, symbol.yield_stmt,
+                  symbol.yield_expr]
+        
+    except AttributeError:
+        # Python 2.4:        
+        symlst = [symbol.break_stmt, symbol.classdef, symbol.continue_stmt,
+                  symbol.decorator, symbol.decorators, symbol.eval_input,
+                  symbol.except_clause, symbol.exec_stmt, symbol.flow_stmt,
+                  symbol.for_stmt, symbol.fpdef, symbol.fplist, symbol.funcdef,
+                  symbol.global_stmt, symbol.import_as_name, symbol.import_as_names,
+                  symbol.import_from, symbol.import_name, symbol.import_stmt,
+                  symbol.lambdef, symbol.print_stmt, symbol.raise_stmt,
+                  symbol.try_stmt, symbol.while_stmt]
+    
+    return symlst
+
+def _parseconf(confstr):
+    """
+    Parse the configuration *confstr* string and remove anything else
+    than the supported constructs, which are:
+
+    Assignments, bool, dict list, string, float, bool, and, or, xor,
+    arithmetics, string expressions and if..then..else.
+
+    The *entire* statement containing the unsupported statement is removed
+    from the parser; the effect is that the whole expression is ignored
+    from the 'root' down.  
+
+    The modified AST object is returned to the Python parser for evaluation. 
+    """
+    # Initialise the parse tree, convert to list format and get a list of
+    # the symbol ID's for the unwanted statements. Might raise SyntaxError.
+    
+    ast = parser.suite(confstr)
+    stmts = parser.ast2list(ast)
+    rmsym = _get_forbidden_symbols()
+
+    result = list()
+    
+    # copy 256: 'single_input', 257: 'file_input' or 258: 'eval_input'. The
+    # parse tree must begin with one of these to compile back to an AST obj.
+
+    result.append(stmts[0])
+
+    # NOTE: This might be improved with reduce(...) builtin!? How can we get
+    #       line number for better warnings?
+
+    for i in range(1, len(stmts)):
+        # censor the parse tree produced from parsing the configuration.
+        if _check_ast(stmts[i], rmsym):
+            result.append(stmts[i])
+        else:
+            pass
+        
+    return parser.sequence2ast(result)
+
+def _check_ast(astlist, forbidden):
+    """
+    Recursively check a branch of the AST tree (in list form) for "forbidden"
+    symbols. A token terminates the search.
+
+    Returns False if any "forbidden symbols" are present, True otherwise. 
+    """
+    # check for token - tokens are always allowed.
+    if astlist[0] in token.tok_name.keys():
+        return True
+    
+    elif astlist[0] in forbidden:
+        raise UserWarning('Statement containing '+symbol.sym_name[astlist[0]]
+            +' not allowed, ignored!')
+        return False
+    
+    else:
+        return _check_ast(astlist[1], forbidden)
+       
+def parse_config(confstr):
+    """
+    Use *eval(...)* to execute a filtered AST tree formed by parsing a
+    configuration file, removing unwanted expressions (if any) and then
+    compiling the filtered output to Python byte code. This approach
+    allows the use of Python expressions and comments in config files,
+    avoids the use of modules which is not particularily pretty (IMO).
+
+    The following expressions (and combinations of) are allowed:
+
+    Assignments, Arithmetic, Strings, Lists, if...then...else and
+    Comments.
+
+    Returns a dict containing the configuration values, if successful. 
+    """
+    dummy  = dict(shell=shell)
+    result = dict()
+
+    # Parse the python source code into a filtered AST-tree.
+    cast = _parseconf(confstr)
+
+    # Compile AST to bytecode, this also detects syntax errors.
+    cobj = parser.compileast(cast)
+
+    # Run the bytecode. The dicts *dummy* and *results* are placeholders
+    # for the *globals* *locals* environments used by *eval(...)*. The
+    # variables declared and initialised in the config file will end up
+    # in *locals* together with the *__globals__* environment while the
+    # *locals* will contain only the values created by *eval(...)*. This
+    # is good, because we can protect *__globals__* and return only the
+    # configuration values by doing this:
+    
+    eval(cobj, dummy, result)
+    return result
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
