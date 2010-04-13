@@ -498,13 +498,23 @@ def parse_config(confstr, shell=shell, options={}):
     def package(name, min=None, max=None):
         return dict(name=name, min=min, max=max, type="package")
 
+    def file(**kw):
+        return kw
+
+    globals = {
+        'shell'     : shell,
+        'file'      : file,
+        'conf'      : file,
+        'glob'      : file,
+        'package'   : package,
+        'curry'     : curry,
+    }
+    globals.update(dict(("PLZ_%s" % k.upper(),v) for k,v in options.items()))
+    result = dict()
+
     # Parse the python source code into a filtered AST-tree.
     # Compile AST to bytecode, this also detects syntax errors.
     cobj = parser.compileast(_parseconf(confstr))
-
-    globals = dict(("PLZ_%s" % k.upper(),v) for k,v in options.items())
-    globals.update(dict(shell=shell, package=package))
-    result = dict()
 
     # Run the bytecode. The dicts global and results are placeholders
     # for the globals and locals environments used by eval(...).    
