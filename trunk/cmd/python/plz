@@ -494,13 +494,16 @@ def parse_config(confstr, shell=shell, options={}):
 
     Returns a dict containing the configuration values, if successful. 
     """
-     
+    
+    def package(name, min=None, max=None):
+        return dict(name=name, min=min, max=max, type="package")
+
     # Parse the python source code into a filtered AST-tree.
     # Compile AST to bytecode, this also detects syntax errors.
     cobj = parser.compileast(_parseconf(confstr))
 
     globals = dict(("PLZ_%s" % k.upper(),v) for k,v in options.items())
-    globals.update(dict(shell=shell))
+    globals.update(dict(shell=shell, package=package))
     result = dict()
 
     # Run the bytecode. The dicts global and results are placeholders
