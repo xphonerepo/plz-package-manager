@@ -98,7 +98,7 @@ def create_action(args, options={}):
     for arg in args:
         # set the CWD of the shell to the directory of the conf file
         sh = curry(shell, cwd=dirname(arg)) 
-        print parse_config(open(arg).read(), shell=sh)
+        print parse_config(open(arg).read(), shell=sh, options=options)
 
 def activate_action(args, options={}):
     """
@@ -334,7 +334,7 @@ def dispatch(argv):
     if func:
         options, args = parser.parse_args(argv[2:])
         if len(args) >= min_args(func):
-            func(args, options)
+            func(args, vars(options))
         else:
             action = first([a for a in aliases().pop(func) if len(a)>2])
             parser.error("command '%s' requires an argument" % action)
@@ -437,8 +437,7 @@ def _parseconf(confstr):
     # Initialise the parse tree, convert to list format and get a list of
     # the symbol ID's for the unwanted statements. Might raise SyntaxError.
     
-    ast = parser.suite(confstr)
-    stmts = parser.ast2list(ast)
+    stmts = parser.ast2list(parser.suite(confstr))
     rmsym = _get_forbidden_symbols()
 
     result = list()
@@ -450,14 +449,12 @@ def _parseconf(confstr):
 
     # NOTE: This might be improved with reduce(...) builtin!? How can we get
     #       line number for better warnings?
-
     for i in range(1, len(stmts)):
         # censor the parse tree produced from parsing the configuration.
         if _check_ast(stmts[i], rmsym):
             result.append(stmts[i])
         else:
             pass
-        
     return parser.sequence2ast(result)
 
 def _check_ast(astlist, forbidden):
@@ -475,17 +472,15 @@ def _check_ast(astlist, forbidden):
         raise UserWarning('Statement containing '+symbol.sym_name[astlist[0]]
             +' not allowed, ignored!')
         return False
-    
     else:
         return _check_ast(astlist[1], forbidden)
        
-def parse_config(confstr,shell=shell):
+def parse_config(confstr, shell=shell, options={}):
     """
-    Use *eval(...)* to execute a filtered AST tree formed by parsing a
+    Use eval(...) to execute a filtered AST tree formed by parsing a
     configuration file, removing unwanted expressions (if any) and then
     compiling the filtered output to Python byte code. This approach
-    allows the use of Python expressions and comments in config files,
-    avoids the use of modules which is not particularily pretty (IMO).
+    allows the use of Python expressions and comments in config files.
 
     The following expressions (and combinations of) are allowed:
 
@@ -494,24 +489,18 @@ def parse_config(confstr,shell=shell):
 
     Returns a dict containing the configuration values, if successful. 
     """
-    dummy  = dict(shell=shell)
+     
+    # Parse the python source code into a filtered AST-tree.
+    # Compile AST to bytecode, this also detects syntax errors.
+    cobj = parser.compileast(_parseconf(confstr))
+
+    globals = dict(("PLZ_%s" % k.upper(),v) for k,v in options.items())
+    globals.update(dict(shell=shell))
     result = dict()
 
-    # Parse the python source code into a filtered AST-tree.
-    cast = _parseconf(confstr)
-
-    # Compile AST to bytecode, this also detects syntax errors.
-    cobj = parser.compileast(cast)
-
-    # Run the bytecode. The dicts *dummy* and *results* are placeholders
-    # for the *globals* *locals* environments used by *eval(...)*. The
-    # variables declared and initialised in the config file will end up
-    # in *locals* together with the *__globals__* environment while the
-    # *locals* will contain only the values created by *eval(...)*. This
-    # is good, because we can protect *__globals__* and return only the
-    # configuration values by doing this:
-    
-    eval(cobj, dummy, result)
+    # Run the bytecode. The dicts global and results are placeholders
+    # for the globals and locals environments used by eval(...).    
+    eval(cobj, globals, result)
     return result
 
 if __name__ == "__main__":
