@@ -201,7 +201,7 @@ def available_actions():
     return [(a[:-7], f) for a,f in globals().items() 
                 if type(f).__name__ == 'function' and a[-7:] == '_action']
 
-def global_options():
+def global_options(arg=None):
     """
     Global options:
         --root ARG              : the base file system path, default is /opt/plz
@@ -212,6 +212,11 @@ def global_options():
     All option values can be set via environment variables as PLZ_ABC where ABC is
     the option name in uppercase. E.g. PLZ_USERNAME=wheel plz install ... 
     """
+    default = {
+        'root'  : '/opt/plz',
+    }
+    if arg in default:
+        return default[arg]
 
 def range_expansion(s):
     """
@@ -297,7 +302,7 @@ def get_options(action):
         pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*([\w.]+)?\s*:"
         options = [filter(lambda x:len(x)>1, p) for p in re.findall(pattern, doc, re.M)]
         for opt in options:
-            env = os.getenv("PLZ_%s" % opt[-2].upper())
+            env = os.getenv("PLZ_%s" % opt[-2].upper()) or global_options(opt[-2])
             if opt[-1] == 'ARG':
                 parser.add_option(*opt[:-2], **dict(dest=opt[-2], default=env))
             elif opt[-1] == 'ARG...':
