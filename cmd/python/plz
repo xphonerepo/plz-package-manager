@@ -382,6 +382,33 @@ def curry(func, *args, **kw):
     """
     return lambda *p, **n: func(*args + p, **dict(kw.items() + n.items()))
 
+def without_callable(vals):
+    """
+    Remove elements that are callable.
+    """
+    return dict((k,v) for k,v in vals.items() if not hasattr(v,'__call__'))
+
+def package_config_funcs():
+    """
+    Define functions that can be called in a configuration file.
+    Each defining function should return a tuple with (handler, dict)
+    where the handler can perform any logic for that configuration, 
+    and dict containing the argument data passed.
+    """
+    def package(name, min=None, max=None):
+        return (package, without_callable(locals()))
+
+    def file(dest, src, perm=0644, owner=None, group=None):
+        return (file, without_callable(locals()))
+
+    def conf(dest, src, perm=0644, owner=None, group=None, expand=False, overwrite=False):
+        return (conf, without_callable(locals()))
+    
+    def glob(dest, src, perm=0644, owner=None, group=None):
+        return (glob, without_callable(locals()))
+    
+    return locals()
+
 # --- python based config parser ---
 
 # This parses a configuration file using a restricted Python syntax.
@@ -494,22 +521,12 @@ def parse_config(confstr, shell=shell, options={}):
 
     Returns a dict containing the configuration values, if successful. 
     """
-    
-    def package(name, min=None, max=None):
-        return dict(name=name, min=min, max=max, type="package")
-
-    def file(**kw):
-        return kw
-
-    globals = {
-        'shell'     : shell,
-        'file'      : file,
-        'conf'      : file,
-        'glob'      : file,
-        'package'   : package,
-        'curry'     : curry,
-    }
-    globals.update(dict(("PLZ_%s" % k.upper(),v) for k,v in options.items()))
+  
+    # add package callable functions, shell and environment variables
+    # to the config eval globals.
+    globals = package_config_funcs()
+    globals['shell'] = shell
+    globals.update(("PLZ_%s" % k.upper(),v) for k,v in options.items())
     result = dict()
 
     # Parse the python source code into a filtered AST-tree.
