@@ -102,13 +102,29 @@ def create_action(args, options={}):
 def build_package(config_file, options):
     # set the CWD of the shell to the directory of the config file
     sh = curry(shell, cwd=dirname(config_file)) 
-    config = parse_config(open(config_file).read(), shell=sh, options=options)
-    config_errors = validate_package_config(config)
-    if len(config_errors) == 0:
-        prepare_package(config, config_file, options)
-    else:
+    try:
+        config = parse_config(open(config_file).read(), shell=sh, options=options)
+        config_errors = validate_package_config(config)
+    except Exception, syn:
+        # format syntax error message in parsing config file
+        import traceback
+        trace = []
+        # truncate stack trace to start at the config file
+        for line in traceback.format_exc(syn).splitlines():
+            if 'File "<string>"' in line or 'File "<syntax-tree>"' in line:
+                line = line.replace("<string>", config_file).strip()
+                line = line.replace("<syntax-tree>", config_file)
+                trace.append(line)
+            elif len(trace)>0:
+                trace.append("    "+line)
+        if len(trace)==0:
+            trace.append(str(syn))
+        config_errors = ["\n".join(trace)]
+    if len(config_errors) > 0:
         print "The package config '%s' has the following problems:" % config_file
-        print "\n".join("   - %s" % e for e in config_errors)
+        print "\n".join("  - %s" % e for e in config_errors)
+    else:
+        prepare_package(config, config_file, options)
 
 def validate_package_config(config):
     errors = []
