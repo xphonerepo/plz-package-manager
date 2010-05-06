@@ -90,15 +90,38 @@ def set_action(args, options={}):
     """
     print args
 
+# --- package creation ---
 def create_action(args, options={}):
     """
     Create new packages.
     Usage: plz create mypackage.plz ...
     """
     for arg in args:
-        # set the CWD of the shell to the directory of the conf file
-        sh = curry(shell, cwd=dirname(arg)) 
-        print parse_config(open(arg).read(), shell=sh, options=options)
+        build_package(arg, options)
+
+def build_package(config_file, options):
+    # set the CWD of the shell to the directory of the config file
+    sh = curry(shell, cwd=dirname(config_file)) 
+    config = parse_config(open(config_file).read(), shell=sh, options=options)
+    config_errors = validate_package_config(config)
+    if len(config_errors) == 0:
+        prepare_package(config, config_file, options)
+    else:
+        print "The package config '%s' has the following problems:" % config_file
+        print "\n".join("   - %s" % e for e in config_errors)
+
+def validate_package_config(config):
+    errors = []
+    required = set(['NAME', 'VERSION', 'DESCRIPTION', 'AUTHOR'])
+    found = required & set(config.keys())
+    if len(found) < len(required):
+        errors.append("Keywords %s are required." % ", ".join(required - found))
+    return errors
+
+def prepare_package(config, config_file, options):
+    print config, config_file, options
+
+# --- package activation ---
 
 def activate_action(args, options={}):
     """
