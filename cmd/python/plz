@@ -30,7 +30,7 @@
 #
 # rev: $Id$
 
-import inspect, os, sys, re, optparse
+import os, sys, re
 
 def install_action(packages, options={}):
     """
@@ -91,13 +91,13 @@ def set_action(args, options={}):
     print args
 
 # --- package creation ---
-def create_action(args, options={}):
+def create_action(config_files, options={}):
     """
     Create new packages.
-    Usage: plz create mypackage.plz ...
+    Usage: plz create mypackage.conf ...
     """
-    for arg in args:
-        build_package(arg, options)
+    for file in config_files:
+        build_package(file, options)
 
 def build_package(config_file, options):
     # set the CWD of the shell to the directory of the config file
@@ -305,6 +305,7 @@ def range_expansions(iter):
     return results
 
 def get_options(action):
+    import optparse
     """
     Extract action options from action function doc. Returns OptionParser.
     
@@ -354,6 +355,7 @@ def get_options(action):
     return parser
 
 def min_args(func):
+    import inspect
     """Returns minimum number of required arguments of the function."""
     spec = inspect.getargspec(func)
     return len(spec[0]) - len(spec[3]) 
@@ -458,9 +460,8 @@ def package_config_funcs():
 # Based on http://code.activestate.com/recipes/576404-python-config-file-parser/
 # by Frithiof andreas, MIT license.
 
-import parser, symbol, token
- 
 def _get_forbidden_symbols():
+    import symbol
     """
     Returns a list of symbol codes representing statements that are NOT
     wanted in configuration files.
@@ -492,6 +493,7 @@ def _get_forbidden_symbols():
     return symlst
 
 def _parseconf(confstr):
+    import parser
     """
     Parse the configuration *confstr* string and remove anything else
     than the supported constructs, which are:
@@ -529,6 +531,7 @@ def _parseconf(confstr):
     return parser.sequence2ast(result)
 
 def _check_ast(astlist, forbidden):
+    import token
     """
     Recursively check a branch of the AST tree (in list form) for "forbidden"
     symbols. A token terminates the search.
@@ -547,6 +550,7 @@ def _check_ast(astlist, forbidden):
         return _check_ast(astlist[1], forbidden)
        
 def parse_config(confstr, shell=shell, options={}):
+    import parser
     """
     Use eval(...) to execute a filtered AST tree formed by parsing a
     configuration file, removing unwanted expressions (if any) and then
