@@ -30,12 +30,12 @@
 #
 # rev: $Id$
 
-import os, sys, re
+import os, sys, re, errno
 
 def install_action(packages, options={}):
     """
     Install a list of packages.
-    usage: plz install PACKAGES...
+    Usage: plz install PACKAGES...
 
     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque id consectetur
     urna. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere 
@@ -56,7 +56,7 @@ i_action = install_action
 def help_action(action=None, options={}):
     """
     Display help information for an action.
-    usage: plz help ACTION
+    Usage: plz help ACTION
     actions: %s
     """
     doc = help_doc(first(action))
@@ -70,18 +70,18 @@ def help_action(action=None, options={}):
 def start_action(packages, options={}):
     """
     Start a list of packages.
-    usage: plz start PACKGES...
+    Usage: plz start PACKGES...
     """
 
 def stop_action(packages, options={}):
     """
     Stop a list of packages.
-    usage: plz stop PACKAGES...
+    Usage: plz stop PACKAGES...
     """
 def restart_action(packages, options={}):
     """
     Restart a list of packages.
-    usage: plz restart PACKAGES...
+    Usage: plz restart PACKAGES...
     """
 def set_action(args, options={}):
     """
@@ -95,11 +95,21 @@ def create_action(config_files, options={}):
     """
     Create new packages.
     Usage: plz create mypackage.conf ...
+
+    Valid options:
+        -t [--test]             : create a test package, default option
+        -r [--release]          : create a production release package
+        -l [--link]             : create a link package
+        -c [--clean]            : clean up package working directory on completion
     """
     for file in config_files:
         build_package(file, options)
 
 def build_package(config_file, options):
+    """
+    A series of steps in building new package tar.bz2
+    Most of configuration errors are tracked here.
+    """
     # set the CWD of the shell to the directory of the config file
     sh = curry(shell, cwd=dirname(config_file)) 
     try:
@@ -124,18 +134,88 @@ def build_package(config_file, options):
         print "The package config '%s' has the following problems:" % config_file
         print "\n".join("  - %s" % e for e in config_errors)
     else:
+        # everything looks ok, start building
         prepare_package(config, config_file, options)
 
 def validate_package_config(config):
+    """
+    Verify package contains minimal wellformed keywords such as NAME, VERSION, etc.
+    """
     errors = []
     required = set(['NAME', 'VERSION', 'DESCRIPTION', 'AUTHOR'])
     found = required & set(config.keys())
     if len(found) < len(required):
         errors.append("Keywords %s are required." % ", ".join(required - found))
+    if re.search('\s', config.get('NAME','')):
+        errors.append('Package NAME "%s" may not contain any white spaces.' % config['NAME'])
+    if not re.search('^\d+(\.\d{1,4})*$', config.get('VERSION', '')):
+        errors.append('Package VERSION "%s" should be like "1.1234.9".' % config['VERSION'])
     return errors
 
 def prepare_package(config, config_file, options):
-    print config, config_file, options
+    """
+    Creates working directory, copy files, and build a tar package file.
+    """
+    working_dir = package_working_dir(config)
+    rmdir(working_dir) 
+    create_package_meta(working_dir, config_file, config)
+
+    # TODO: now find files and/or create symlinks
+    
+    create_tar_package(config, config_file, options)
+    if options.get("clean"):
+        rmdir(package_working_dir(config))
+
+def create_package_meta(working_dir, config_file, config):
+    """
+    Copy the package.conf fils and other meta data to a new directory named "plz.dist".
+    Files in "plz.dist" should be the original files.
+    A file named "+PACKAGE" is create to contain the package name, version and description.
+    """
+    import shutil
+    distdir = "%s/plz.dist" % working_dir
+    mkdir(distdir)
+    shutil.copy(config_file, "%s/package.conf" % distdir)
+    package_info = "%(NAME)s %(VERSION)s\n%(DESCRIPTION)s" % config
+    f = open("%s/+PACKAGE" % working_dir, 'w')
+    f.write(package_info)
+    f.close()
+
+def create_tar_package(config, config_file, options):
+    """
+    Create a tar file with bzip2 compression, and add all the files and directories 
+    in the working directory.
+    """
+    import tarfile
+    file = package_tar_name(config, options)
+    if os.path.isfile(file):
+        os.remove(file)
+    tar = tarfile.open(file, 'w:bz2')
+    package_output_dir = "%(NAME)s-%(VERSION)s" % config
+    tar.add(package_working_dir(config),package_output_dir)
+    tar.close()    
+
+def package_working_dir(config):
+    """
+    Working directory for building package, based on 
+    package name and platform identifier.
+    """
+    import platform
+    return "%s-%s-%s" % (config.get("NAME"), config.get("VERSION"), platform.platform())
+
+def package_tar_name(config, options):
+    """
+    Tar file name, based on release state. Adds timestamp for
+    symlink and test packages.
+    """
+    import time
+    if options.get("release"):
+        version = config.get("VERSION")
+    elif options.get("link"):
+        version = "%sL%d" % (config.get("VERSION"), time.time())
+    else:
+        version = "%sT%d" % (config.get("VERSION"), time.time())
+    return "%s-%s.tar.bz2" % (config.get("NAME"), version)
 
 # --- package activation ---
 
@@ -195,11 +275,37 @@ def dependents_action(packages, options={}):
 
 deps_action = dependents_action
 
+# --- system support fuctions ---
+
+def mkdir(path):
+    """
+    Create intermediate directories as required.
+    """
+    try:
+        os.makedirs(path)
+    except OSError, e:
+        if e.errno == errno.EEXIST:
+            pass
+        else: raise
+
+def rmdir(path):
+    """
+    Delete everything reachavle from the directory path, including itself.
+    CAUTION: This can delete path = "/"
+    """
+    for root, dirs, files in os.walk(path, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            os.rmdir(os.path.join(root, name))
+    if os.path.isdir(path):
+        os.rmdir(path)
+
 # --- support functions ---
 
 def default_help():
     info = """
-    usage: plz <command> [options] [args]
+    Usage: plz <command> [options] [args]
     Type 'plz help <command>' for help on a specific command.
 
     Available actions:
@@ -336,7 +442,7 @@ def get_options(action):
         -n                      : short boolean option
     """
     doc = help_doc(action)
-    usage = re.findall("^(usage: .*)$", doc, re.M) or ["usage: plz <command>"]
+    usage = re.findall("^(usage: .*)$", doc, re.M | re.I) or ["Usage: plz <command>"]
     parser = optparse.OptionParser(usage=usage[0], conflict_handler="resolve")
     def parse_options(doc, parser):
         pattern = "^\s*(-{1,2}(\w+))(?:\s+\[(--(\w+))\])?\s*([\w.]+)?\s*:"
@@ -382,8 +488,10 @@ def dispatch(argv):
         if len(args) >= min_args(func):
             func(args, vars(options))
         else:
+            # finds the original action name, not alias
             action = first([a for a in aliases().pop(func) if len(a)>2])
-            parser.error("command '%s' requires an argument" % action)
+            print help_doc(action)
+            print "\nERROR: command '%s' requires an argument." % action
     else:
         parser.error("Unknown command '%s'" % argv[1])
 
