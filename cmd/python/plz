@@ -164,6 +164,12 @@ def validate_package_config(src_dir, config):
         find = prepare_glob_files(src_dir, pattern)
         if len(pattern["files"])==0:
             errors.append('Unable to find files "%s".' % find)
+
+    # execute find command, ensure at least 1 file
+    for findcmd in config.get("FINDS"):
+        prepare_find_cmd_files(src_dir, findcmd)
+        if len(findcmd["files"])==0:
+            errors.append('Unable to find files using command "find %s".' % findcmd["cmd"])
     return errors
 
 def package_src_file(src_dir, filename):
@@ -171,9 +177,9 @@ def package_src_file(src_dir, filename):
     If filename starts with "/" then assume absolute path, otherwise relative to src_dir.
     """
     if filename[0]=="/":
-        return filename
+        return os.path.realpath(filename)
     else:
-        return "%(src_dir)s/%(filename)s" % locals()
+        return os.path.realpath("%(src_dir)s/%(filename)s" % locals())
 
 def prepare_glob_files(src_dir, pattern):
     """
@@ -185,15 +191,33 @@ def prepare_glob_files(src_dir, pattern):
     file_template = pattern.copy()
     pattern["files"] = []
     for filename in glob.glob(find):
-        file = file_template.copy()
-        file["src"] = filename.replace(src_dir+"/", '')
-        file["src_file"] = filename
-        if file["dest"][-1]=="/":
-            file["dest"] = "%(dest)s%(src)s" % file
-        else:
-            file["dest"] = "%(dest)s/%(src)s" % file
-        pattern["files"].append(file)
+        info = get_src_file_info(file_template, src_dir, filename)
+        if info != None:
+            pattern["files"].append(info)
     return find
+
+def get_src_file_info(template, src_dir, filename):
+    if os.path.isfile(filename):
+        info = template.copy()
+        info["src_file"] = filename
+        info["src"] = filename.replace(src_dir+"/", "")
+        if info["dest"][-1]=="/":
+            info["dest"] = "%(dest)s%(src)s" % info
+        else:
+            info["dest"] = "%(dest)s/%(src)s" % info
+        return info
+    return None
+
+def prepare_find_cmd_files(src_dir, find, exe="/usr/bin/find"):
+    sh = curry(shell, cwd=src_dir) 
+    files = sh("%s %s" % (exe, find["args"]))
+    file_template = find.copy()    
+    find["files"] = []
+    for found in files.split("\n"):
+        filename = package_src_file(src_dir, found)
+        info = get_src_file_info(file_template, src_dir, filename)
+        if info != None:
+            find["files"].append(info)
 
 def prepare_package(config, config_file, options):
     """
@@ -220,6 +244,8 @@ def package_file_list(config):
     files.extend(config.get("MKDIRS"))
     for pattern in config.get("GLOBS"):
         files.extend(pattern["files"])
+    for find in config.get("FINDS"):
+        files.extend(find["files"])
     return files
 
 def prepare_package_file(working_dir, file, config, options):
@@ -695,7 +721,7 @@ def package_config_funcs(_result):
         dir = True
         _append_config('MKDIRS', locals())
 
-    def find(dest, cmd, perm=None, owner=None, group=None):
+    def find(dest, args, perm=None, owner=None, group=None):
         _append_config('FINDS', locals())
 
     def start(cmd, priority=100):
