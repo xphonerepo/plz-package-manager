@@ -261,14 +261,46 @@ def create_package_meta(working_dir, config_file, config):
 def create_tar_package(config, config_file, options):
     """
     Create a tar file with bzip2 compression, and add all the files and directories 
-    in the working directory.
+    in the working directory. File pemissions and ownership can be configured globally
+    as OWNER, GROUP or per file basis as "owner" and "group" as defined in the functions
+    in package_config_funcs().
     """
     import tarfile
-    file = package_tar_name(config, options)
-    if os.path.isfile(file):
-        os.remove(file)
-    tar = tarfile.open(file, 'w:bz2')
+    
     package_output_dir = "%(NAME)s-%(VERSION)s" % config
+
+    # build a list of destination file ownerships
+    file_owners = dict()
+    for file in package_file_list(config):
+        dest    = "%s/%s" % (package_output_dir, file["dest"])
+        file_owners[dest] = dict(uname=file.get("owner"), gname=file.get("group"))
+    default_owner = dict(uname=config.get("OWNER"), gname=config.get("GROUP"))
+    
+    def update_ownership(tarinfo):
+        ownership = default_owner.copy()
+        
+        # override default ownership from file config
+        if tarinfo.name in file_owners:
+            file_owner = file_owners[tarinfo.name].items()
+            file_owner = dict((k,v) for k,v in file_owner if v != None)
+            ownership.update(file_owner)
+
+        # update each file with new ownership info
+        for k,v in ownership.items():
+            if v != None:
+                setattr(tarinfo,k,v)
+    
+    # update file ownership before adding to tar
+    class PlzTarFile(tarfile.TarFile):
+        def addfile(self, tarinfo, fileobj=None):
+            update_ownership(tarinfo)
+            tarfile.TarFile.addfile(self, tarinfo, fileobj)
+
+    # create tar file
+    filename = package_tar_name(config, options)
+    if os.path.isfile(filename):
+        os.remove(filename)
+    tar = PlzTarFile.open(filename, 'w:bz2')
     tar.add(package_working_dir(config),package_output_dir)
     tar.close()    
 
