@@ -154,10 +154,9 @@ def validate_package_config(src_dir, config):
 
     # check for missing source files
     for file in config.get("FILES"):
-        src_file = "%s/%s" % (src_dir, file.get("src"))
-        file["src_file"] = src_file
-        if not os.path.isfile(src_file):            
-            errors.append('Unable to find file "%s".' % src_file)
+        file["src_file"] = "%s/%s" % (src_dir, file.get("src"))
+        if not os.path.isfile(file["src_file"]):
+            errors.append('Unable to find file "%s".' % file["src_file"])
     return errors
 
 def prepare_package(config, config_file, options):
@@ -176,6 +175,10 @@ def prepare_package(config, config_file, options):
         rmdir(package_working_dir(config))
 
 def prepare_package_file(working_dir, file, config, options):
+    """
+    Copies the source file to the destination file in the working directory.
+    Creates a symlink file if the option is to create "--link"
+    """
     import shutil
     file["working_file"] = "%s/%s" % (working_dir, file["dest"])
     mkdir(os.path.dirname(file["working_file"]))
