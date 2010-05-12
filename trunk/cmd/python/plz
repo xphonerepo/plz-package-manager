@@ -110,11 +110,12 @@ def build_package(config_file, options):
     A series of steps in building new package tar.bz2
     Most of configuration errors are tracked here.
     """
+    src_dir = dirname(config_file)
     # set the CWD of the shell to the directory of the config file
-    sh = curry(shell, cwd=dirname(config_file)) 
+    sh = curry(shell, cwd=src_dir) 
     try:
         config = parse_config(open(config_file).read(), shell=sh, options=options)
-        config_errors = validate_package_config(config)
+        config_errors = validate_package_config(src_dir, config)
     except Exception, syn:
         # format syntax error message in parsing config file
         import traceback
@@ -137,7 +138,7 @@ def build_package(config_file, options):
         # everything looks ok, start building
         prepare_package(config, config_file, options)
 
-def validate_package_config(config):
+def validate_package_config(src_dir, config):
     """
     Verify package contains minimal wellformed keywords such as NAME, VERSION, etc.
     """
@@ -150,6 +151,13 @@ def validate_package_config(config):
         errors.append('Package NAME "%s" may not contain any white spaces.' % config['NAME'])
     if not re.search('^\d+(\.\d{1,4})*$', config.get('VERSION', '')):
         errors.append('Package VERSION "%s" should be like "1.1234.9".' % config['VERSION'])
+
+    # check for missing source files
+    for file in config.get("FILES"):
+        src_file = "%s/%s" % (src_dir, file.get("src"))
+        file["src_file"] = src_file
+        if not os.path.isfile(src_file):            
+            errors.append('Unable to find file "%s".' % src_file)
     return errors
 
 def prepare_package(config, config_file, options):
@@ -158,13 +166,23 @@ def prepare_package(config, config_file, options):
     """
     working_dir = package_working_dir(config)
     rmdir(working_dir) 
-    create_package_meta(working_dir, config_file, config)
+    create_package_meta(working_dir, config_file, config)    
 
-    # TODO: now find files and/or create symlinks
+    for file in config.get("FILES"):
+        prepare_package_file(working_dir, file, config, options)
     
     create_tar_package(config, config_file, options)
     if options.get("clean"):
         rmdir(package_working_dir(config))
+
+def prepare_package_file(working_dir, file, config, options):
+    import shutil
+    file["working_file"] = "%s/%s" % (working_dir, file["dest"])
+    mkdir(os.path.dirname(file["working_file"]))
+    if options.get("link"):
+        os.symlink(file["src_file"], file["working_file"])
+    else:
+        shutil.copy(file["src_file"], file["working_file"])
 
 def create_package_meta(working_dir, config_file, config):
     """
@@ -256,6 +274,14 @@ def list_action(packages=[], options={}):
     List installed packages.
     Usage: plz list [PACKAGES...]
     """
+    import tarfile
+    for pack in packages:
+        t = tarfile.open(pack, 'r|bz2')
+        t.next().name
+        meta = t.extractfile(t.next())
+        print meta.read()
+        t.close()
+
 
 ls_action = list_action
 
@@ -537,26 +563,31 @@ def without_callable(vals):
     """
     return dict((k,v) for k,v in vals.items() if not hasattr(v,'__call__'))
 
-def package_config_funcs():
+def package_config_funcs(_result): 
     """
     Define functions that can be called in a configuration file.
-    Each defining function should return a tuple with (handler, dict)
-    where the handler can perform any logic for that configuration, 
-    and dict containing the argument data passed.
+    Each function appends its function parameter values to the result dictionary.
     """
-    def package(name, min=None, max=None):
-        return (package, without_callable(locals()))
+    # initial configurations for package, files, confs, and globs
+    _result.update(dict(REQUIRES=[], FILES=[], CONFS=[], GLOBS=[]))
+    def _append_config(config, params):
+        _result[config].append(without_callable(params))
+
+    # -- available functions in configuration file --
+    def requires(name, min=None, max=None):        
+        _append_config('REQUIRES', locals())
 
     def file(dest, src, perm=0644, owner=None, group=None):
-        return (file, without_callable(locals()))
+        _append_config('FILES', locals())
 
     def conf(dest, src, perm=0644, owner=None, group=None, expand=False, overwrite=False):
-        return (conf, without_callable(locals()))
+        _append_config('CONFS', locals())
     
     def glob(dest, src, perm=0644, owner=None, group=None):
-        return (glob, without_callable(locals()))
-    
-    return locals()
+        _append_config('GLOBS', locals())
+   
+    # all functions defined above without starting with '_'
+    return dict((k,v) for k,v in locals().items() if k[0] != '_' and hasattr(v,'__call__'))
 
 # --- python based config parser ---
 
@@ -675,10 +706,10 @@ def parse_config(confstr, shell=shell, options={}):
   
     # add package callable functions, shell and environment variables
     # to the config eval globals.
-    globals = package_config_funcs()
+    result = dict()
+    globals = package_config_funcs(result)
     globals['shell'] = shell
     globals.update(("PLZ_%s" % k.upper(),v) for k,v in options.items())
-    result = dict()
 
     # Parse the python source code into a filtered AST-tree.
     # Compile AST to bytecode, this also detects syntax errors.
