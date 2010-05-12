@@ -122,6 +122,7 @@ def build_package(config_file, options):
         trace = []
         # truncate stack trace to start at the config file
         for line in traceback.format_exc(syn).splitlines():
+            #print line # debug
             if 'File "<string>"' in line or 'File "<syntax-tree>"' in line:
                 line = line.replace("<string>", config_file).strip()
                 line = line.replace("<syntax-tree>", config_file)
@@ -182,10 +183,11 @@ def prepare_package_file(working_dir, file, config, options):
     import shutil
     file["working_file"] = "%s/%s" % (working_dir, file["dest"])
     mkdir(os.path.dirname(file["working_file"]))
-    if options.get("link"):
-        os.symlink(file["src_file"], file["working_file"])
-    else:
-        shutil.copy(file["src_file"], file["working_file"])
+    if not os.path.isfile(file["working_file"]):
+        if options.get("link"):
+            os.symlink(file["src_file"], file["working_file"])
+        else:
+            shutil.copy(file["src_file"], file["working_file"])
 
 def create_package_meta(working_dir, config_file, config):
     """
@@ -613,7 +615,7 @@ def _get_forbidden_symbols():
         symlst = [symbol.break_stmt, symbol.classdef, symbol.continue_stmt,
                   symbol.decorator, symbol.decorators, symbol.eval_input,
                   symbol.except_clause, symbol.exec_stmt, symbol.flow_stmt,
-                  symbol.for_stmt, symbol.fpdef, symbol.fplist, symbol.funcdef,
+                  symbol.fpdef, symbol.fplist, symbol.funcdef,
                   symbol.global_stmt, symbol.import_as_name, symbol.import_as_names,
                   symbol.import_from, symbol.import_name, symbol.import_stmt,
                   symbol.lambdef, symbol.old_lambdef, symbol.print_stmt,
@@ -626,7 +628,7 @@ def _get_forbidden_symbols():
         symlst = [symbol.break_stmt, symbol.classdef, symbol.continue_stmt,
                   symbol.decorator, symbol.decorators, symbol.eval_input,
                   symbol.except_clause, symbol.exec_stmt, symbol.flow_stmt,
-                  symbol.for_stmt, symbol.fpdef, symbol.fplist, symbol.funcdef,
+                  symbol.fpdef, symbol.fplist, symbol.funcdef,
                   symbol.global_stmt, symbol.import_as_name, symbol.import_as_names,
                   symbol.import_from, symbol.import_name, symbol.import_stmt,
                   symbol.lambdef, symbol.print_stmt, symbol.raise_stmt,
@@ -673,7 +675,7 @@ def _parseconf(confstr):
     return parser.sequence2ast(result)
 
 def _check_ast(astlist, forbidden):
-    import token
+    import token, symbol
     """
     Recursively check a branch of the AST tree (in list form) for "forbidden"
     symbols. A token terminates the search.
