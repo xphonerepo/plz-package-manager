@@ -158,7 +158,33 @@ def validate_package_config(src_dir, config):
         file["src_file"] = "%s/%s" % (src_dir, file.get("src"))
         if not os.path.isfile(file["src_file"]):
             errors.append('Unable to find file "%s".' % file["src_file"])
+
+    # find glob files, ensure at least 1 file
+    for pattern in config.get("GLOBS"):
+        find = prepare_glob_files(src_dir, pattern)
+        if len(pattern["files"])==0:
+            errors.append('Unable to find files "%s".' % find)
     return errors
+
+def prepare_glob_files(src_dir, pattern):
+    """
+    Find all the source files and corresponding destination file 
+    for a given glob pattern.
+    """
+    import glob
+    find = "%s/%s" % (src_dir, pattern.get("src"))
+    files = []
+    for filename in glob.glob(find):
+        file = pattern.copy()
+        file["src"] = filename.replace(src_dir+"/", '')
+        file["src_file"] = filename
+        if file["dest"][-1]=="/":
+            file["dest"] = "%(dest)s%(src)s" % file
+        else:
+            file["dest"] = "%(dest)s/%(src)s" % file
+        files.append(file)
+    pattern["files"] = files
+    return find
 
 def prepare_package(config, config_file, options):
     """
@@ -168,12 +194,22 @@ def prepare_package(config, config_file, options):
     rmdir(working_dir) 
     create_package_meta(working_dir, config_file, config)    
 
-    for file in config.get("FILES"):
+    for file in package_file_list(config):
         prepare_package_file(working_dir, file, config, options)
     
     create_tar_package(config, config_file, options)
     if options.get("clean"):
         rmdir(package_working_dir(config))
+
+def package_file_list(config):
+    """
+    Return a list of files (with source, destination, and permission) for the
+    package, that is, files in FILES and GLOBS.
+    """
+    files = config.get("FILES")
+    for pattern in config.get("GLOBS"):
+        files.extend(pattern["files"])
+    return files
 
 def prepare_package_file(working_dir, file, config, options):
     """
@@ -193,13 +229,16 @@ def create_package_meta(working_dir, config_file, config):
     """
     Copy the package.conf fils and other meta data to a new directory named "plz.dist".
     Files in "plz.dist" should be the original files.
-    A file named "+PACKAGE" is create to contain the package name, version and description.
+    A file named "+PACKAGE" is create to contain the package name, version,
+    description, and destination file list.
     """
     import shutil
     distdir = "%s/plz.dist" % working_dir
     mkdir(distdir)
     shutil.copy(config_file, "%s/package.conf" % distdir)
+    files = [file["dest"] for file in package_file_list(config)]
     package_info = "%(NAME)s %(VERSION)s\n%(DESCRIPTION)s" % config
+    package_info += "\n\nFILES:\n" + "\n".join(files)
     f = open("%s/+PACKAGE" % working_dir, 'w')
     f.write(package_info)
     f.close()
@@ -574,13 +613,22 @@ def package_config_funcs(_result):
     Each function appends its function parameter values to the result dictionary.
     """
     # initial configurations for package, files, confs, and globs
-    _result.update(dict(REQUIRES=[], FILES=[], CONFS=[], GLOBS=[]))
+    _result.update(dict(REQUIRES=[], CONFLICTS=[],
+                        SETTINGS=[],
+                        FILES=[], CONFS=[], GLOBS=[], 
+                        STARTS=[], STOPS=[]))
     def _append_config(config, params):
         _result[config].append(without_callable(params))
 
     # -- available functions in configuration file --
-    def requires(name, min=None, max=None):        
+    def requires(name, min=None, max=None):
         _append_config('REQUIRES', locals())
+
+    def conflicts(name, min=None, max=None):
+        _append_config('CONFLICTS', locals())
+
+    def setting(name, *args, **kw):
+        _append_config('SETTINGS', locals())
 
     def file(dest, src, perm=0644, owner=None, group=None):
         _append_config('FILES', locals())
@@ -590,6 +638,12 @@ def package_config_funcs(_result):
     
     def glob(dest, src, perm=0644, owner=None, group=None):
         _append_config('GLOBS', locals())
+
+    def start(cmd, priority=100):
+        _append_config('STARTS', locals())
+        
+    def stop(cmd, priority=100):
+        _append_config('STOPS', locals())
    
     # all functions defined above without starting with '_'
     return dict((k,v) for k,v in locals().items() if k[0] != '_' and hasattr(v,'__call__'))
