@@ -160,7 +160,7 @@ def validate_package_config(src_dir, config):
             errors.append('Unable to find file "%s".' % file["src_file"])
 
     # find glob files, ensure at least 1 file
-    for pattern in config.get("GLOBS"):
+    for pattern in config.get("GLOBS"): 
         find = prepare_glob_files(src_dir, pattern)
         if len(pattern["files"])==0:
             errors.append('Unable to find files "%s".' % find)
@@ -182,9 +182,10 @@ def prepare_glob_files(src_dir, pattern):
     """
     import glob
     find = package_src_file(src_dir, pattern.get("src"))
+    file_template = pattern.copy()
     pattern["files"] = []
     for filename in glob.glob(find):
-        file = pattern.copy()
+        file = file_template.copy()
         file["src"] = filename.replace(src_dir+"/", '')
         file["src_file"] = filename
         if file["dest"][-1]=="/":
@@ -204,7 +205,7 @@ def prepare_package(config, config_file, options):
 
     for file in package_file_list(config):
         prepare_package_file(working_dir, file, config, options)
-    
+
     create_tar_package(config, config_file, options)
     if options.get("clean"):
         rmdir(package_working_dir(config))
@@ -214,7 +215,8 @@ def package_file_list(config):
     Return a list of files (with source, destination, and permission) for the
     package, that is, files in FILES and GLOBS.
     """
-    files = config.get("FILES")
+    files = []
+    files.extend(config.get("FILES"))
     for pattern in config.get("GLOBS"):
         files.extend(pattern["files"])
     return files
@@ -232,6 +234,11 @@ def prepare_package_file(working_dir, file, config, options):
             os.symlink(file["src_file"], file["working_file"])
         else:
             shutil.copy(file["src_file"], file["working_file"])
+
+        # set file permissions
+        perm = file.get("perm") or config.get("PERM")
+        if perm:
+            os.lchmod(file["working_file"], perm)
 
 def create_package_meta(working_dir, config_file, config):
     """
@@ -638,13 +645,13 @@ def package_config_funcs(_result):
     def setting(name, *args, **kw):
         _append_config('SETTINGS', locals())
 
-    def file(dest, src, perm=0644, owner=None, group=None):
+    def file(dest, src, perm=None, owner=None, group=None):
         _append_config('FILES', locals())
 
-    def conf(dest, src, perm=0644, owner=None, group=None, expand=False, overwrite=False):
+    def conf(dest, src, perm=None, owner=None, group=None, expand=False, overwrite=False):
         _append_config('CONFS', locals())
     
-    def glob(dest, src, perm=0644, owner=None, group=None):
+    def glob(dest, src, perm=None, owner=None, group=None):
         _append_config('GLOBS', locals())
 
     def start(cmd, priority=100):
