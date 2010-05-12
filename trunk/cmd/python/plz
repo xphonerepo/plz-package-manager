@@ -217,6 +217,7 @@ def package_file_list(config):
     """
     files = []
     files.extend(config.get("FILES"))
+    files.extend(config.get("MKDIRS"))
     for pattern in config.get("GLOBS"):
         files.extend(pattern["files"])
     return files
@@ -228,17 +229,21 @@ def prepare_package_file(working_dir, file, config, options):
     """
     import shutil
     file["working_file"] = "%s/%s" % (working_dir, file["dest"])
-    mkdir(os.path.dirname(file["working_file"]))
-    if not os.path.isfile(file["working_file"]):
-        if options.get("link"):
-            os.symlink(file["src_file"], file["working_file"])
-        else:
-            shutil.copy(file["src_file"], file["working_file"])
 
-        # set file permissions
-        perm = file.get("perm") or config.get("PERM")
-        if perm:
-            os.lchmod(file["working_file"], perm)
+    if file.get("src_file"):
+        mkdir(os.path.dirname(file["working_file"]))
+        if not os.path.isfile(file["working_file"]):
+            if options.get("link"):
+                os.symlink(file["src_file"], file["working_file"])
+            else:
+                shutil.copy(file["src_file"], file["working_file"])
+    elif file.get("dir"):
+        mkdir(file["working_file"])
+
+    # set file permissions
+    perm = file.get("perm") or config.get("PERM")
+    if perm:
+        os.lchmod(file["working_file"], perm)
 
 def create_package_meta(working_dir, config_file, config):
     """
@@ -662,7 +667,7 @@ def package_config_funcs(_result):
     # initial configurations for package, files, confs, and globs
     _result.update(dict(REQUIRES=[], CONFLICTS=[],
                         SETTINGS=[],
-                        FILES=[], CONFS=[], GLOBS=[], 
+                        FILES=[], CONFS=[], GLOBS=[], MKDIRS=[], FINDS=[],
                         STARTS=[], STOPS=[]))
     def _append_config(config, params):
         _result[config].append(without_callable(params))
@@ -685,6 +690,13 @@ def package_config_funcs(_result):
     
     def glob(dest, src, perm=None, owner=None, group=None):
         _append_config('GLOBS', locals())
+
+    def mkdir(dest, perm=None, owner=None, group=None):
+        dir = True
+        _append_config('MKDIRS', locals())
+
+    def find(dest, cmd, perm=None, owner=None, group=None):
+        _append_config('FINDS', locals())
 
     def start(cmd, priority=100):
         _append_config('STARTS', locals())
