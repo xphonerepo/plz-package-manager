@@ -155,7 +155,7 @@ def validate_package_config(src_dir, config):
 
     # check for missing source files
     for file in config.get("FILES"):
-        file["src_file"] = "%s/%s" % (src_dir, file.get("src"))
+        file["src_file"] = package_src_file(src_dir, file.get("src"))
         if not os.path.isfile(file["src_file"]):
             errors.append('Unable to find file "%s".' % file["src_file"])
 
@@ -166,14 +166,23 @@ def validate_package_config(src_dir, config):
             errors.append('Unable to find files "%s".' % find)
     return errors
 
+def package_src_file(src_dir, filename):
+    """
+    If filename starts with "/" then assume absolute path, otherwise relative to src_dir.
+    """
+    if filename[0]=="/":
+        return filename
+    else:
+        return "%(src_dir)s/%(filename)s" % locals()
+
 def prepare_glob_files(src_dir, pattern):
     """
     Find all the source files and corresponding destination file 
     for a given glob pattern.
     """
     import glob
-    find = "%s/%s" % (src_dir, pattern.get("src"))
-    files = []
+    find = package_src_file(src_dir, pattern.get("src"))
+    pattern["files"] = []
     for filename in glob.glob(find):
         file = pattern.copy()
         file["src"] = filename.replace(src_dir+"/", '')
@@ -182,8 +191,7 @@ def prepare_glob_files(src_dir, pattern):
             file["dest"] = "%(dest)s%(src)s" % file
         else:
             file["dest"] = "%(dest)s/%(src)s" % file
-        files.append(file)
-    pattern["files"] = files
+        pattern["files"].append(file)
     return find
 
 def prepare_package(config, config_file, options):
