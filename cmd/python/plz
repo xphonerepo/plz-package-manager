@@ -225,11 +225,11 @@ def prepare_package(config, config_file, options):
     """
     working_dir = package_working_dir(config)
     rmdir(working_dir) 
-    create_package_meta(working_dir, config_file, config)    
 
     for file in package_file_list(config):
         prepare_package_file(working_dir, file, config, options)
 
+    create_package_meta(working_dir, config_file, config)    
     create_tar_package(config, config_file, options)
     if options.get("clean"):
         rmdir(package_working_dir(config))
@@ -265,7 +265,7 @@ def prepare_package_file(working_dir, file, config, options):
                 shutil.copy(file["src_file"], file["working_file"])
     elif file.get("dir"):
         mkdir(file["working_file"])
-
+    file["size"] = os.path.getsize(file["working_file"])
     # set file permissions on non-symlinked files
     perm = file.get("perm") or config.get("PERM")
     if config.get("link") == None and perm:
@@ -286,10 +286,12 @@ def create_package_meta(working_dir, config_file, config):
     info = dict()
     for keyword in basics:
         info[keyword] = config.get(keyword)
-    file_info = ('dest', 'group', 'owner', 'perm')
+    file_info = ('dest', 'group', 'owner', 'perm', 'size')
     info["FILES"] = []
+    info["PAYLOAD_SIZE"] = 0
     for file in package_file_list(config):
-        info["FILES"].append(dict((k,file[k]) for k in file_info))
+        info["FILES"].append(dict((k,file.get(k)) for k in file_info))
+        info["PAYLOAD_SIZE"] += file.get("size") or 0
     package_info = pprint.pformat(info)
     f = open("%s/+PACKAGE" % working_dir, 'w')
     f.write(package_info)
