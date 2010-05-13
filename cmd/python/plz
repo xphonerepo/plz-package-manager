@@ -278,13 +278,19 @@ def create_package_meta(working_dir, config_file, config):
     A file named "+PACKAGE" is create to contain the package name, version,
     description, and destination file list.
     """
-    import shutil
+    import shutil, pprint
     distdir = "%s/plz.dist" % working_dir
     mkdir(distdir)
     shutil.copy(config_file, "%s/package.conf" % distdir)
-    files = [file["dest"] for file in package_file_list(config)]
-    package_info = "%(NAME)s %(VERSION)s\n%(DESCRIPTION)s" % config
-    package_info += "\n\nFILES:\n" + "\n".join(files)
+    basics = ('NAME', 'VERSION', 'DESCRIPTION', 'CHANGELOG', 'AUTHOR', 'WEBSITE')
+    info = dict()
+    for keyword in basics:
+        info[keyword] = config.get(keyword)
+    file_info = ('dest', 'group', 'owner', 'perm')
+    info["FILES"] = []
+    for file in package_file_list(config):
+        info["FILES"].append(dict((k,file[k]) for k in file_info))
+    package_info = pprint.pformat(info)
     f = open("%s/+PACKAGE" % working_dir, 'w')
     f.write(package_info)
     f.close()
