@@ -297,18 +297,25 @@ def create_package_meta(working_dir, config_file, config):
     f.write(package_info)
     f.close()
 
-def get_package_meta(bz2file):
+def get_package_meta(package_file):
     """
     Tries to find the +PACKAGE meta data in the first 10 files of the tar bz2 file.
     The file object can be the 1st block of the tar file (900k in size).
     Uses EVAL to load the meta data string. Returns None on missing package meta file.
     """
-    tar = tarfile.open(fileobj=bz2file, mode="r|*")
-    for i in range(1,10):
-        file = tar.next()
-        if file and file.name[-9:] == '/+PACKAGE':
-            info = tar.extractfile(file).read()
-            return eval(info)
+    import tarfile
+    if not hasattr(package_file, "read") and os.path.isfile(package_file):
+        package_file = file(package_file)
+    if hasattr(package_file, "read"):
+        try:
+            tar = tarfile.open(fileobj=package_file, mode="r|*")
+            for i in range(1,10):
+                tarinfo = tar.next()
+                if tarinfo and tarinfo.name[-9:] == '/+PACKAGE':
+                    info = tar.extractfile(tarinfo).read()
+                    return eval(info)
+        except tarfile.ReadError:
+            pass
     return None
 
 def create_tar_package(config, config_file, options):
@@ -418,14 +425,8 @@ def list_action(packages=[], options={}):
     List installed packages.
     Usage: plz list [PACKAGES...]
     """
-    import tarfile
     for pack in packages:
-        t = tarfile.open(pack, 'r|bz2')
-        t.next().name
-        meta = t.extractfile(t.next())
-        print meta.read()
-        t.close()
-
+        print get_package_meta(pack)
 
 ls_action = list_action
 
