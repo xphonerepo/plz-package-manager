@@ -266,10 +266,10 @@ def prepare_package_file(working_dir, file, config, options):
     elif file.get("dir"):
         mkdir(file["working_file"])
 
-    # set file permissions
+    # set file permissions on non-symlinked files
     perm = file.get("perm") or config.get("PERM")
-    if perm:
-        os.lchmod(file["working_file"], perm)
+    if config.get("link") == None and perm:
+        os.chmod(file["working_file"], perm)
 
 def create_package_meta(working_dir, config_file, config):
     """
